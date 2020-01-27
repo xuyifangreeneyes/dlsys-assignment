@@ -93,6 +93,69 @@ def make_matrix_mul(shapeA, transposeA, shapeB, transposeB, tgt, tgt_host,
                     lambda i, j: tvm.sum(AA[i, k] * BB[k, j], axis=k))
 
     s = tvm.create_schedule(C.op)
+
+    bn = 32
+    CC = s.cache_write(C, 'global')
+    xo, yo, xi, yi = s[C].tile(C.op.axis[0], C.op.axis[1], bn, bn)
+    s[CC].compute_at(s[C], yo)
+    xc, yc = s[CC].op.axis
+    k, = s[CC].op.reduce_axis
+    ko, ki = s[CC].split(k, factor=4)
+    s[CC].reorder(ko, xc, ki, yc)
+    s[CC].unroll(ki)
+    s[CC].vectorize(yc)
+
+    s[C].parallel(xo)
+
+    # bn = 32
+    # if (transposeA is False) and (transposeB is False):
+    #     k = tvm.reduce_axis((0, A.shape[1]), name="k")
+    #     C = tvm.compute((A.shape[0], B.shape[1]),
+    #                     lambda i, j: tvm.sum(A[i, k] * B[k, j], axis=k))
+    #
+    #     s = tvm.create_schedule(C.op)
+    #     xo, yo, xi, yi = s[C].tile(C.op.axis[0], C.op.axis[1], bn, bn)
+    #     k, = s[C].op.reduce_axis
+    #     ko, ki = s[C].split(k, factor=4)
+    #     s[C].reorder(xo, yo, ko, xi, ki, yi)
+    #     s[C].vectorize(yi)
+    #
+    # elif (transposeA is True) and (transposeB is False):
+    #     k = tvm.reduce_axis((0, A.shape[0]), name="k")
+    #     C = tvm.compute((A.shape[1], B.shape[1]),
+    #                     lambda i, j: tvm.sum(A[k, i] * B[k, j], axis=k))
+    #
+    #     s = tvm.create_schedule(C.op)
+    #     xo, yo, xi, yi = s[C].tile(C.op.axis[0], C.op.axis[1], bn, bn)
+    #     k, = s[C].op.reduce_axis
+    #     ko, ki = s[C].split(k, factor=4)
+    #     s[C].reorder(xo, yo, ko, ki, xi, yi)
+    #     s[C].vectorize(yi)
+    #
+    # elif (transposeA is False) and (transposeB is True):
+    #     k = tvm.reduce_axis((0, A.shape[1]), name="k")
+    #     C = tvm.compute((A.shape[0], B.shape[0]),
+    #                     lambda i, j: tvm.sum(A[i, k] * B[j, k], axis=k))
+    #
+    #     s = tvm.create_schedule(C.op)
+    #     xo, yo, xi, yi = s[C].tile(C.op.axis[0], C.op.axis[1], bn, bn)
+    #     k, = s[C].op.reduce_axis
+    #     ko, ki = s[C].split(k, factor=4)
+    #     s[C].reorder(xo, yo, ko, xi, yi, ki)
+    #     # s[C].vectorize(ki)
+    #
+    # else:
+    #     k = tvm.reduce_axis((0, A.shape[0]), name="k")
+    #     C = tvm.compute((A.shape[1], B.shape[0]),
+    #                     lambda i, j: tvm.sum(A[k, i] * B[j, k], axis=k))
+    #
+    #     s = tvm.create_schedule(C.op)
+    #     xo, yo, xi, yi = s[C].tile(C.op.axis[0], C.op.axis[1], bn, bn)
+    #     k, = s[C].op.reduce_axis
+    #     ko, ki = s[C].split(k, factor=4)
+    #     s[C].reorder(xo, yo, ko, yi, xi, ki)
+    #     # s[C].vectorize(yi)
+
     f = tvm.build(s, [A, B, C], tgt, target_host=tgt_host, name=func_name)
     return f
 
