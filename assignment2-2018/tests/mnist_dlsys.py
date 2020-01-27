@@ -1,3 +1,5 @@
+import sys
+sys.path.append("./python")
 import numpy as np
 import argparse
 import six.moves.cPickle as pickle
@@ -55,7 +57,7 @@ def load_mnist_data(dataset):
 
 def convert_to_one_hot(vals):
     """Helper method to convert label array to one-hot array."""
-    one_hot_vals = np.zeros((vals.size, vals.max()+1))
+    one_hot_vals = np.zeros((vals.size, vals.max() + 1))
     one_hot_vals[np.arange(vals.size), vals] = 1
     return one_hot_vals
 
@@ -130,7 +132,7 @@ def mnist_logreg(executor_ctx, num_epochs=10, print_loss_val_each_epoch=False):
             y_val.copyfrom(
                 convert_to_one_hot(train_set_y[minibatch_start:minibatch_end]))
             loss_val, grad_W1_val, grad_b1_val, _ = executor.run(
-                feed_dict = {X: X_val, y_: y_val, W1: W1_val, b1: b1_val})
+                feed_dict={X: X_val, y_: y_val, W1: W1_val, b1: b1_val})
             # SGD update
             # W1_val = W1_val - lr * grad_W1_val
             # b1_val = b1_val - lr * grad_b1_val
@@ -138,8 +140,8 @@ def mnist_logreg(executor_ctx, num_epochs=10, print_loss_val_each_epoch=False):
             b1_sgd_update_func(b1_val, grad_b1_val, b1_val)
         time_measurements.append(time.time() - start_time)
         if print_loss_val_each_epoch:
-            print("loss = %f; Time taken this epoch = %f s" 
-                % (np.asscalar(loss_val.asnumpy()), time_measurements[-1]))
+            print("loss = %f; Time taken this epoch = %f s"
+                  % (np.asscalar(loss_val.asnumpy()), time_measurements[-1]))
 
     correct_predictions = []
     for minibatch_index in range(n_valid_batches):
@@ -150,10 +152,10 @@ def mnist_logreg(executor_ctx, num_epochs=10, print_loss_val_each_epoch=False):
             convert_to_one_hot(valid_set_y[minibatch_start:minibatch_end]))
         _, _, _, valid_y_predicted = executor.run(
             feed_dict={
-                        X: valid_X_val,
-                        y_: valid_y_val,
-                        W1: W1_val,
-                        b1: b1_val},
+                X: valid_X_val,
+                y_: valid_y_val,
+                W1: W1_val,
+                b1: b1_val},
             convert_to_numpy_ret_vals=True)
         correct_prediction = np.equal(
             np.argmax(valid_y_val.asnumpy(), 1),
@@ -163,7 +165,7 @@ def mnist_logreg(executor_ctx, num_epochs=10, print_loss_val_each_epoch=False):
     # validation set accuracy=0.928200
     print("Validation set accuracy = %f" % accuracy)
     print("Average Time per Training Epoch = %f s" % np.mean(time_measurements))
-    
+
 
 def mnist_mlp(executor_ctx=None, num_epochs=10,
               print_loss_val_each_epoch=False):
@@ -270,16 +272,16 @@ def mnist_mlp(executor_ctx=None, num_epochs=10,
             y_val.copyfrom(
                 convert_to_one_hot(train_set_y[minibatch_start:minibatch_end]))
             loss_val, grad_W1_val, grad_W2_val, grad_W3_val, \
-                grad_b1_val, grad_b2_val, grad_b3_val, _ = executor.run(
-                    feed_dict={
-                        X: X_val,
-                        y_: y_val,
-                        W1: W1_val,
-                        W2: W2_val,
-                        W3: W3_val,
-                        b1: b1_val,
-                        b2: b2_val,
-                        b3: b3_val})
+            grad_b1_val, grad_b2_val, grad_b3_val, _ = executor.run(
+                feed_dict={
+                    X: X_val,
+                    y_: y_val,
+                    W1: W1_val,
+                    W2: W2_val,
+                    W3: W3_val,
+                    b1: b1_val,
+                    b2: b2_val,
+                    b3: b3_val})
             # SGD update
             # W1_val = W1_val - lr * grad_W1_val
             # W2_val = W2_val - lr * grad_W2_val
@@ -293,12 +295,11 @@ def mnist_mlp(executor_ctx=None, num_epochs=10,
             b1_sgd_update_func(b1_val, grad_b1_val, b1_val)
             b2_sgd_update_func(b2_val, grad_b2_val, b2_val)
             b3_sgd_update_func(b3_val, grad_b3_val, b3_val)
-        
+
         time_measurements.append(time.time() - start_time)
         if print_loss_val_each_epoch:
-            print("loss = %f; Time taken this epoch = %f s" 
-                % (np.asscalar(loss_val.asnumpy()), time_measurements[-1]))
-
+            print("loss = %f; Time taken this epoch = %f s"
+                  % (np.asscalar(loss_val.asnumpy()), time_measurements[-1]))
 
     correct_predictions = []
     for minibatch_index in range(n_valid_batches):
@@ -326,7 +327,7 @@ def mnist_mlp(executor_ctx=None, num_epochs=10,
     # validation set accuracy=0.970800
     print("Validation set accuracy = %f" % accuracy)
     print("Average Time per Training Epoch = %f s" % np.mean(time_measurements))
-    
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -365,7 +366,7 @@ if __name__ == "__main__":
     executor_ctx = tvm.context(tgt, 0)
 
     print_loss_val_each_epoch = True if args.print_loss_val_each_epoch \
-                                     else False
+        else False
     num_epochs = args.num_epoch
     for m in models:
         m(executor_ctx, num_epochs, print_loss_val_each_epoch)

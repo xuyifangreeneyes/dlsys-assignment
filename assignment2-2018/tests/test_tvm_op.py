@@ -1,5 +1,4 @@
 import sys
-import os
 sys.path.append("./python")
 import numpy as np
 import tvm
