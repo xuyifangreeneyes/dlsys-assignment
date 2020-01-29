@@ -27,6 +27,15 @@ def test_broadcast_to():
     y = arr_y.asnumpy()
     np.testing.assert_allclose(np.broadcast_to(x, to_shape), y)
 
+    shape = (300,)
+    to_shape = (200, 300)
+    x = np.random.uniform(-1, 1, shape).astype(np.float32)
+    arr_x = ndarray.array(x, ctx=ctx)
+    arr_y = ndarray.empty(to_shape, ctx=ctx)
+    gpu_op.broadcast_to(arr_x, arr_y)
+    y = arr_y.asnumpy()
+    np.testing.assert_allclose(np.broadcast_to(x, to_shape), y)
+
 
 def test_reduce_sum_axis_zero():
     ctx = ndarray.gpu(0)
@@ -115,7 +124,16 @@ def test_matrix_multiply():
     gpu_op.matrix_multiply(arr_x, False, arr_y, True, arr_z)
     z = arr_z.asnumpy()
     np.testing.assert_allclose(np.dot(x, np.transpose(y)), z, rtol=1e-5)
-    
+
+    x = np.random.uniform(0, 10, size=(500, 1000)).astype(np.float32)
+    y = np.random.uniform(0, 10, size=(500, 2000)).astype(np.float32)
+    arr_x = ndarray.array(x, ctx=ctx)
+    arr_y = ndarray.array(y, ctx=ctx)
+    arr_z = ndarray.empty((1000, 2000), ctx=ctx)
+    gpu_op.matrix_multiply(arr_x, True, arr_y, False, arr_z)
+    z = arr_z.asnumpy()
+    np.testing.assert_allclose(np.dot(np.transpose(x), y), z, rtol=1e-5)
+
     x = np.random.uniform(0, 10, size=(500, 1000)).astype(np.float32)
     y = np.random.uniform(0, 10, size=(2000, 500)).astype(np.float32)
     arr_x = ndarray.array(x, ctx=ctx)
