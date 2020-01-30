@@ -86,63 +86,47 @@ __global__ void softmax_kernel(int nrow, int ncol,
   }
 }
 
-__global__ void matrix_elem_add_kernel(int nrow, int ncol, 
+__global__ void matrix_elem_add_kernel(int num, 
                                        const float *matA,
                                        const float *matB,
                                        float *output) {
   int x = threadIdx.x + blockIdx.x * blockDim.x;
-  int y = threadIdx.y + blockIdx.y * blockDim.y;
   int stride_x = blockDim.x * gridDim.x;
-  int stride_y = blockDim.y * gridDim.y;
-  for (int i = x; i < nrow; i += stride_x) {
-    for (int j = y; j < ncol; j += stride_y) {
-      output[i * ncol + j] = matA[i * ncol + j] + matB[i * ncol + j];
-    }
+  for (int i = x; i < num; i += stride_x) {
+      output[i] = matA[i] + matB[i];
   }
 }
 
-__global__ void matrix_elem_add_by_const_kernel(int nrow, int ncol, 
+__global__ void matrix_elem_add_by_const_kernel(int num, 
                                                 const float *input,
                                                 float val,
                                                 float *output) {
   int x = threadIdx.x + blockIdx.x * blockDim.x;
-  int y = threadIdx.y + blockIdx.y * blockDim.y;
   int stride_x = blockDim.x * gridDim.x;
-  int stride_y = blockDim.y * gridDim.y;
-  for (int i = x; i < nrow; i += stride_x) {
-    for (int j = y; j < ncol; j += stride_y) {
-      output[i * ncol + j] = input[i * ncol + j] + val;
-    }
+  for (int i = x; i < num; i += stride_x) {
+    output[i] = input[i] + val;
   }
 }
 
-__global__ void matrix_elem_mul_kernel(int nrow, int ncol, 
+__global__ void matrix_elem_mul_kernel(int num, 
                                        const float *matA,
                                        const float *matB,
                                        float *output) {
   int x = threadIdx.x + blockIdx.x * blockDim.x;
-  int y = threadIdx.y + blockIdx.y * blockDim.y;
   int stride_x = blockDim.x * gridDim.x;
-  int stride_y = blockDim.y * gridDim.y;
-  for (int i = x; i < nrow; i += stride_x) {
-    for (int j = y; j < ncol; j += stride_y) {
-      output[i * ncol + j] = matA[i * ncol + j] * matB[i * ncol + j];
-    }
+  for (int i = x; i < num; i += stride_x) {
+    output[i] = matA[i] * matB[i];
   }
 }
 
-__global__ void matrix_elem_mul_by_const_kernel(int nrow, int ncol, 
+__global__ void matrix_elem_mul_by_const_kernel(int num, 
                                                 const float *input,
                                                 float val,
                                                 float *output) {
   int x = threadIdx.x + blockIdx.x * blockDim.x;
-  int y = threadIdx.y + blockIdx.y * blockDim.y;
   int stride_x = blockDim.x * gridDim.x;
-  int stride_y = blockDim.y * gridDim.y;
-  for (int i = x; i < nrow; i += stride_x) {
-    for (int j = y; j < ncol; j += stride_y) {
-      output[i * ncol + j] = input[i * ncol + j] * val;
-    }
+  for (int i = x; i < num; i += stride_x) {
+    output[i] = input[i] * val;
   }
 }
 
@@ -205,14 +189,6 @@ void checkMatrixShape(const DLArrayHandle mat1, const DLArrayHandle mat2) {
   assert(mat1->shape[0] == mat2->shape[0] && mat1->shape[1] == mat2->shape[1]); 
 }
 
-void checkMatrixShape(const DLArrayHandle mat1,
-                const DLArrayHandle mat2,
-                const DLArrayHandle mat3) {
-  assert(mat1->ndim == 2 & mat2->ndim == 2 & mat3->ndim == 2);
-  assert(mat1->shape[0] == mat2->shape[0] && mat2->shape[0] == mat3->shape[0] && 
-         mat1->shape[1] == mat2->shape[1] && mat2->shape[1] == mat3->shape[1]);
-}
-
 int DLGpuArraySet(DLArrayHandle arr, float value) { 
   int ndim = arr->ndim;
   int num = 1;
@@ -268,23 +244,26 @@ int DLGpuReduceSumAxisZero(const DLArrayHandle input, DLArrayHandle output) {
 
 int twoMatElemOp(const DLArrayHandle matA, const DLArrayHandle matB, 
                  DLArrayHandle output, ElemOp elemOp) {
-  checkMatrixShape(matA, matB, output);
-  int nrow = matA->shape[0];
-  int ncol = matA->shape[1];
+  assert(matA->ndim == matB->ndim && matB->ndim == output->ndim);
+  int ndim = matA->ndim;
+  int num = 1;
+  for (int i = 0; i < ndim; ++i) {
+    assert(matA->shape[i] == matB->shape[i] && matB->shape[i] == output->shape[i]);
+    num *= matA->shape[i];
+  }
   const float *mat_a_data = (const float *)matA->data;
   const float *mat_b_data = (const float *)matB->data;
   float *output_data = (float *)output->data;
-  dim3 blockSize(32, 32);
-  dim3 gridSize((nrow + blockSize.x - 1) / blockSize.x, 
-                (ncol + blockSize.y - 1) / blockSize.y);
+  dim3 blockSize(1024);
+  dim3 gridSize((num + blockSize.x - 1) / blockSize.x);
   switch (elemOp) {
     case Add:
       matrix_elem_add_kernel<<<gridSize, blockSize>>>(
-        nrow, ncol, mat_a_data, mat_b_data, output_data);   
+        num, mat_a_data, mat_b_data, output_data);   
       break;
     case Mul:
       matrix_elem_mul_kernel<<<gridSize, blockSize>>>(
-        nrow, ncol, mat_a_data, mat_b_data, output_data);
+        num, mat_a_data, mat_b_data, output_data);
       break;
     default:
       assert(false);
@@ -295,22 +274,24 @@ int twoMatElemOp(const DLArrayHandle matA, const DLArrayHandle matB,
 
 int oneMatElemOp(const DLArrayHandle input, DLArrayHandle output,
                  ElemOp elemOp, float val = 0) {
-  checkMatrixShape(input, output);
-  int nrow = input->shape[0];
-  int ncol = input->shape[1];
+  assert(input->ndim == output->ndim);
+  int ndim = input->ndim;
+  int num = 1;
+  for (int i = 0; i < ndim; ++i) {
+    num *= input->shape[i];
+  }
   const float *input_data = (const float *)input->data;
   float *output_data = (float* )output->data;
-  dim3 blockSize(32, 32);
-  dim3 gridSize((nrow + blockSize.x - 1) / blockSize.x, 
-                (ncol + blockSize.y - 1) / blockSize.y);
+  dim3 blockSize(1024);
+  dim3 gridSize((num + blockSize.x - 1) / blockSize.x);
   switch (elemOp) {
     case AddByConst:
       matrix_elem_add_by_const_kernel<<<gridSize, blockSize>>>(
-        nrow, ncol, input_data, val, output_data);
+        num, input_data, val, output_data);
       break;
     case MulByConst:
       matrix_elem_mul_by_const_kernel<<<gridSize, blockSize>>>(
-        nrow, ncol, input_data, val, output_data);
+        num, input_data, val, output_data);
       break;
     default:
       assert(false);
